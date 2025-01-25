@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flatcar Config Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.43/moment-timezone-with-data-1970-2030.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Flatcar Tailscale Config Generator</h1>
+        <div id="app">
+            <div class="form-group">
+                <label for="tailscaleKey">Tailscale Auth Key *</label>
+                <input type="text" id="tailscaleKey" placeholder="tskey-auth-...">
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="setTimezone"> Set Timezone
+                </label>
+                <div id="timezoneGroup" class="hidden">
+                    <select id="timezone"></select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="sshEnabled"> Enable SSH (Port 22)
+                </label>
+                <input type="text" id="sshKey" placeholder="SSH Public Key" class="hidden">
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="autoReboot" checked> Auto Reboot OS After Update
+                </label>
+                <div id="rebootOptions">
+                    <select id="rebootTime">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                    <input type="number" id="rebootWindow" placeholder="Time Window (hours)" min="1" max="24" value="1">
+                </div>
+            </div>
+
+            <button class="button" onclick="generateConfig()">Generate Config</button>
+        </div>
+        <div class="form-group">
+            <h2>Live Config Preview</h2>
+            <pre id="configPreview" class="config-preview"></pre>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

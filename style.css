@@ -1,0 +1,55 @@
+.container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.hidden {
+    display: none;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+input[type="text"], 
+input[type="number"], 
+select {
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+#rebootOptions {
+    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.invalid {
+    border-color: #ff4136;
+}
+
+.error-message {
+    color: #ff4136;
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+}
+
+#rebootOptions.hidden {
+    display: none !important;
+}
+
+.config-preview {
+    background-color: #f5f5f5;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
