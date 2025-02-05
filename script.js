@@ -180,7 +180,7 @@ async function updatePreview() {
             orderedConfig.passwd = {
                 users: [{
                     name: 'core',
-                    ssh_authorized_keys: [sshKey]
+                    sshAuthorizedKeys: [sshKey]
                 }]
             };
         }
