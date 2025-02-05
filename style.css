@@ -1,3 +1,22 @@
+:root {
+    --bg-color: #000;
+    --surface-color: #111111;
+    --lighter-surface: #1a1a1a;
+    --text-color: #fff;
+    --text-secondary: #888;
+    --border-color: #333;
+    --border-hover: #696969;
+    --accent-color: #fc4c02;
+    --accent-hover: #ff7338;
+    --error-color: #ff2e23;
+}
+
+body {
+    user-select: none;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
 .container {
     max-width: 800px;
     margin: 2rem auto;
@@ -18,6 +37,15 @@ select {
     width: 100%;
     padding: 0.5rem;
     margin-top: 0.5rem;
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+input[type="text"]:focus, 
+input[type="number"]:focus, 
+select:focus {
+    border-color: var(--border-hover);
 }
 
 #rebootOptions {
@@ -28,11 +56,19 @@ select {
 }
 
 .invalid {
-    border-color: #ff4136;
+    border-color: var(--error-color) !important;
+    border-width: 1px;
+    border-style: solid;
+    background-color: rgba(255, 65, 54, 0.1);
+}
+
+input.invalid:focus {
+    border-color: var(--error-color) !important;
+    box-shadow: 0 0 0 0.1rem rgba(255, 65, 54, 0.25);
 }
 
 .error-message {
-    color: #ff4136;
+    color: var(--error-color);
     font-size: 0.8rem;
     margin-top: 0.2rem;
 }
@@ -41,15 +77,123 @@ select {
     display: none !important;
 }
 
-.config-preview {
-    background-color: #f5f5f5;
-    padding: 1rem;
-    border: 1px solid #ddd;
+/* Form section spacing */
+#app {
+    margin-bottom: 3rem;
+}
+
+button.button {
+    margin-bottom: 3rem;
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    transition: all 0.2s ease-in-out;
+}
+
+button.button:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+button.button:disabled {
+    background-color: var(--border-color);
+    border-color: var(--border-color);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+button.button:disabled:hover {
+    background-color: var(--border-color);
+    border-color: var(--border-color);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Live preview section styling */
+.preview-section {
+    background: var(--surface-color);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border-color);
+}
+
+.preview-section h2 {
+    margin-bottom: 1.5rem;
+    color: var(--text-color);
+}
+
+.preview-container {
+    position: relative;
+    user-select: none;
+}
+
+.copy-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1;
+    padding: 0.8rem 0.8rem;
+    font-size: 0.8rem;
+    background: var(--accent-color);
+    border: none;
+    color: var(--text-color);
     border-radius: 4px;
-    max-height: 400px;
-    overflow-y: auto;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    height: auto;
+}
+
+.copy-button.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.copy-button:hover {
+    background: var(--accent-hover);
+}
+
+.copy-button:active {
+    background: var(--accent-color);
+}
+
+.config-preview {
+    background-color: var(--lighter-surface);
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
     white-space: pre-wrap;
     word-wrap: break-word;
     font-family: monospace;
     font-size: 0.9rem;
+    user-select: text;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    color: var(--text-color);
+}
+
+input, select, button {
+    user-select: text;
+}
+
+.config-preview:focus {
+    outline: 2px solid var(--border-hover);
+    outline-offset: -2px;
+}
+
+/* Override Milligram defaults for dark mode */
+label {
+    color: var(--text-color);
+}
+
+input[type="checkbox"] {
+    border-color: var(--border-color);
+}
+
+input[type="checkbox"]:checked {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
 }

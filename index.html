@@ -41,18 +41,27 @@
                     <input type="checkbox" id="autoReboot" checked> Auto Reboot OS After Update
                 </label>
                 <div id="rebootOptions">
-                    <select id="rebootTime">
-                        <!-- Options will be populated by JavaScript -->
-                    </select>
-                    <input type="number" id="rebootWindow" placeholder="Time Window (hours)" min="1" max="24" value="1">
+                    <div class="form-group">
+                        <label for="rebootTime">Update Window Start Time</label>
+                        <select id="rebootTime">
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rebootWindow">Update Window Length (Hours)</label>
+                        <input type="number" id="rebootWindow" placeholder="Time Window (hours)" min="1" max="8" value="1">
+                    </div>
                 </div>
             </div>
 
             <button class="button" onclick="generateConfig()">Generate Config</button>
         </div>
-        <div class="form-group">
+        <div class="preview-section">
             <h2>Live Config Preview</h2>
-            <pre id="configPreview" class="config-preview"></pre>
+            <div class="preview-container">
+                <button class="copy-button" onclick="copyConfig()">Copy</button>
+                <pre id="configPreview" class="config-preview" tabindex="0"></pre>
+            </div>
         </div>
     </div>
     <script src="script.js"></script>

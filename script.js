@@ -47,11 +47,56 @@ function compressToGzipBase64(text) {
     }
 }
 
+function validateInputs() {
+    const tailscaleInput = document.getElementById('tailscaleKey');
+    const sshEnabled = document.getElementById('sshEnabled').checked;
+    const sshKey = document.getElementById('sshKey').value.trim();
+    const tailscaleKeyRegex = /^tskey-auth-[A-Za-z0-9]+-[A-Za-z0-9]+$/;
+    const sshKeyRegex = /^(ecdsa-sha2-nistp(256|384|521)\s+AAAAE2VjZHNhLXNoYTItbmlzdHA|sk-ecdsa-sha2-nistp256@openssh.com\s+AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb2|ssh-ed25519\s+AAAAC3NzaC1lZDI1NTE5|sk-ssh-ed25519@openssh.com\s+AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29t|ssh-rsa\s+AAAAB3NzaC1yc2)[0-9A-Za-z+/]+[=]{0,3}(\s.*)?$/;
+    
+    const isTailscaleValid = tailscaleKeyRegex.test(tailscaleInput.value.trim());
+    const isSshValid = !sshEnabled || (sshEnabled && sshKeyRegex.test(sshKey));
+    
+    const copyButton = document.querySelector('.copy-button');
+    const generateButton = document.querySelector('button.button');
+    
+    // Update Tailscale input validation state
+    if (tailscaleInput.value.trim()) {
+        if (isTailscaleValid) {
+            tailscaleInput.classList.remove('invalid');
+        } else {
+            tailscaleInput.classList.add('invalid');
+        }
+    } else {
+        tailscaleInput.classList.remove('invalid');
+    }
+    
+    // Update SSH input validation state
+    const sshInput = document.getElementById('sshKey');
+    if (sshEnabled) {
+        if (!sshKey || !sshKeyRegex.test(sshKey)) {
+            sshInput.classList.add('invalid');
+        } else {
+            sshInput.classList.remove('invalid');
+        }
+    } else {
+        sshInput.classList.remove('invalid');
+    }
+    
+    // Update button states
+    const isValid = isTailscaleValid && isSshValid;
+    generateButton.disabled = !isValid;
+    if (isValid) {
+        copyButton.classList.add('visible');
+    } else {
+        copyButton.classList.remove('visible');
+    }
+}
+
 function initPage() {
     // Timezone population
     const tzSelect = document.getElementById('timezone');
     moment.tz.names()
-        .filter(tz => tz.startsWith('America/'))
         .forEach(tz => {
             const option = document.createElement('option');
             option.value = tz;
@@ -79,8 +124,18 @@ function initPage() {
 
     // Add event listeners for visibility toggles
     document.getElementById('setTimezone').addEventListener('change', updateVisibility);
-    document.getElementById('sshEnabled').addEventListener('change', updateVisibility);
+    document.getElementById('sshEnabled').addEventListener('change', () => {
+        updateVisibility();
+        validateInputs();
+    });
     document.getElementById('autoReboot').addEventListener('change', updateVisibility);
+
+    // Add event listeners for validation
+    document.getElementById('tailscaleKey').addEventListener('input', validateInputs);
+    document.getElementById('sshKey').addEventListener('input', validateInputs);
+
+    // Set initial button states
+    validateInputs();
 }
 
 function updateVisibility() {
@@ -111,8 +166,34 @@ async function updatePreview() {
 
         const config = JSON.parse(JSON.stringify(ignitionTemplate)); // Deep clone
 
+        // Handle SSH configuration first to ensure passwd section is at the top
+        const sshEnabled = document.getElementById('sshEnabled').checked;
+        const sshKey = document.getElementById('sshKey').value.trim();
+
+        // Create a new config object with the correct order
+        const orderedConfig = {
+            ignition: config.ignition
+        };
+
+        // Add passwd section if SSH is enabled and key is provided
+        if (sshEnabled && sshKey) {
+            orderedConfig.passwd = {
+                users: [{
+                    name: 'core',
+                    ssh_authorized_keys: [sshKey]
+                }]
+            };
+        }
+
+        // Add all other sections in order
+        Object.keys(config).forEach(key => {
+            if (key !== 'ignition' && key !== 'passwd') {
+                orderedConfig[key] = config[key];
+            }
+        });
+
         // Update Tailscale auth key
-        const tailscaleService = config.systemd.units.find(u => u.name === 'tailscale.service');
+        const tailscaleService = orderedConfig.systemd.units.find(u => u.name === 'tailscale.service');
         if (tailscaleService && tailscaleService.contents) {
             const authKey = document.getElementById('tailscaleKey').value;
             tailscaleService.contents = tailscaleService.contents.replace(
@@ -121,52 +202,42 @@ async function updatePreview() {
             );
         }
 
-        // Update timezone
-        const timezoneSet = document.getElementById('setTimezone').checked;
-        const tzValue = timezoneSet ? document.getElementById('timezone').value : 'UTC';
-        const tzFile = config.storage.files.find(f => f.path === '/etc/localtime');
-        if (tzFile && tzFile.contents) {
-            tzFile.contents.source = `data:;base64,${compressToGzipBase64(tzValue)}`;
-        }
-
-        // Update SSH configuration
-        const sshEnabled = document.getElementById('sshEnabled').checked;
-        const sshKey = document.getElementById('sshKey').value;
-        const iptablesFile = config.storage.files.find(f => f.path === '/var/lib/iptables/rules-save');
-
-        if (sshEnabled && iptablesFile && iptablesFile.contents) {
-            // Decompress and modify iptables rules
+        // Update iptables for SSH
+        const iptablesFile = orderedConfig.storage.files.find(f => f.path === '/var/lib/iptables/rules-save');
+        if (iptablesFile && iptablesFile.contents) {
             const currentRules = decompressGzip(iptablesFile.contents.source.split(',')[1]);
             let newRules = currentRules;
 
-            if (!currentRules.includes('-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT')) {
+            if (sshEnabled) {
+                if (!currentRules.includes('-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT')) {
+                    newRules = currentRules.replace(
+                        /(-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT\n)/,
+                        "$1-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT\n"
+                    );
+                }
+            } else {
                 newRules = currentRules.replace(
-                    /(-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT\n)/,
-                    "$1-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT\n"
+                    /-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT\n/g, ''
                 );
             }
-
-            // Add SSH key
-            config.passwd = {
-                users: [{
-                    name: 'core',
-                    ssh_authorized_keys: [sshKey]
-                }]
-            };
-
+            
             iptablesFile.contents.source = `data:;base64,${compressToGzipBase64(newRules)}`;
-        } else if (iptablesFile && iptablesFile.contents) {
-            // Remove SSH rules and config
-            const currentRules = decompressGzip(iptablesFile.contents.source.split(',')[1]);
-            const newRules = currentRules.replace(
-                /-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT\n/g, ''
-            );
-            iptablesFile.contents.source = `data:;base64,${compressToGzipBase64(newRules)}`;
-            delete config.passwd;
+        }
+
+        // Update timezone
+        const timezoneSet = document.getElementById('setTimezone').checked;
+        const tzValue = timezoneSet ? document.getElementById('timezone').value : 'Etc/UTC';
+        
+        // Update timezone link
+        if (orderedConfig.storage.links) {
+            const tzLink = orderedConfig.storage.links.find(l => l.path === '/etc/localtime');
+            if (tzLink) {
+                tzLink.target = `/usr/share/zoneinfo/${tzValue}`;
+            }
         }
 
         // Update auto-reboot settings
-        const updateConf = config.storage.files.find(f => f.path === '/etc/flatcar/update.conf');
+        const updateConf = orderedConfig.storage.files.find(f => f.path === '/etc/flatcar/update.conf');
         if (updateConf && updateConf.contents) {
             if (document.getElementById('autoReboot').checked) {
                 const [hours, minutes] = document.getElementById('rebootTime').value.split(':');
@@ -181,7 +252,7 @@ async function updatePreview() {
             }
         }
 
-        document.getElementById('configPreview').textContent = JSON.stringify(config, null, 2);
+        document.getElementById('configPreview').textContent = JSON.stringify(orderedConfig, null, 2);
     } catch (error) {
         document.getElementById('configPreview').textContent = `Error: ${error.message}`;
     }
@@ -191,16 +262,34 @@ async function generateConfig() {
     try {
         // Validate inputs
         const requiredFields = [
-            { id: 'tailscaleKey', message: 'Tailscale auth key is required' },
-            { id: 'sshKey', check: () => document.getElementById('sshEnabled').checked },
-            { id: 'timezone', check: () => document.getElementById('setTimezone').checked },
+            { 
+                id: 'tailscaleKey', 
+                message: 'Invalid or missing Tailscale auth key!',
+                validate: (value) => /^tskey-auth-[A-Za-z0-9]+-[A-Za-z0-9]+$/.test(value.trim())
+            },
+            { 
+                id: 'sshKey', 
+                check: () => document.getElementById('sshEnabled').checked,
+                message: 'Invalid SSH public key format!',
+                validate: (value) => /^(ecdsa-sha2-nistp(256|384|521)\s+AAAAE2VjZHNhLXNoYTItbmlzdHA|sk-ecdsa-sha2-nistp256@openssh.com\s+AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb2|ssh-ed25519\s+AAAAC3NzaC1lZDI1NTE5|sk-ssh-ed25519@openssh.com\s+AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29t|ssh-rsa\s+AAAAB3NzaC1yc2)[0-9A-Za-z+/]+[=]{0,3}(\s.*)?$/.test(value.trim())
+            },
+            { 
+                id: 'timezone', 
+                check: () => document.getElementById('setTimezone').checked 
+            },
         ];
 
         for (const field of requiredFields) {
             const element = document.getElementById(field.id);
-            if (field.check ? field.check() && !element.value.trim() : !element.value.trim()) {
+            const value = element.value;
+            if (field.check ? field.check() && !value.trim() : !value.trim()) {
                 element.classList.add('invalid');
                 alert(field.message || `${field.id} is required`);
+                return;
+            }
+            if (field.validate && !field.validate(value)) {
+                element.classList.add('invalid');
+                alert(field.message);
                 return;
             }
         }
@@ -217,4 +306,34 @@ async function generateConfig() {
     } catch (error) {
         alert(`Error generating config: ${error.message}`);
     }
+}
+
+async function copyConfig() {
+    const configText = document.getElementById('configPreview').textContent;
+    try {
+        await navigator.clipboard.writeText(configText);
+        const button = document.querySelector('.copy-button');
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+            button.textContent = originalText;
+        }, 2000);
+    } catch (err) {
+        alert('Failed to copy config');
+    }
+}
+
+// Add keydown listener on configPreview so that Ctrl+A selects only its content when it is focused
+const configPreviewEl = document.getElementById("configPreview");
+if (configPreviewEl) {
+    configPreviewEl.addEventListener("keydown", function(evt) {
+        if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === "a") {
+            evt.preventDefault();
+            const range = document.createRange();
+            range.selectNodeContents(this);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    });
 }
