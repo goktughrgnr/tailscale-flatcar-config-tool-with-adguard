@@ -281,12 +281,21 @@ async function generateConfig() {
 
         for (const field of requiredFields) {
             const element = document.getElementById(field.id);
-            const value = element.value;
-            if (field.check ? field.check() && !value.trim() : !value.trim()) {
+            const value = element.value.trim();
+            
+            // Skip validation if field has a check function and it returns false
+            if (field.check && !field.check()) {
+                continue;
+            }
+            
+            // Check if required field is empty
+            if (!value) {
                 element.classList.add('invalid');
                 alert(field.message || `${field.id} is required`);
                 return;
             }
+            
+            // Validate field format if validate function exists
             if (field.validate && !field.validate(value)) {
                 element.classList.add('invalid');
                 alert(field.message);
