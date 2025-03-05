@@ -57,6 +57,22 @@ function validateInputs() {
     const isTailscaleValid = tailscaleKeyRegex.test(tailscaleInput.value.trim());
     const isSshValid = !sshEnabled || (sshEnabled && sshKeyRegex.test(sshKey));
     
+    // Validate AdGuard DNS IP if enabled
+    const adguardEnabled = document.getElementById('enableAdGuardDNS').checked;
+    const adguardDnsIp = document.getElementById('adguardDnsIp').value.trim();
+    const ipRegex = /^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+    const isAdguardValid = !adguardEnabled || (adguardEnabled && ipRegex.test(adguardDnsIp));
+    
+    if (adguardEnabled && adguardDnsIp) {
+        if (ipRegex.test(adguardDnsIp)) {
+            document.getElementById('adguardDnsIp').classList.remove('invalid');
+        } else {
+            document.getElementById('adguardDnsIp').classList.add('invalid');
+        }
+    } else {
+        document.getElementById('adguardDnsIp').classList.remove('invalid');
+    }
+    
     const copyButton = document.querySelector('.copy-button');
     const generateButton = document.querySelector('button.button');
     
@@ -84,7 +100,7 @@ function validateInputs() {
     }
     
     // Update button states
-    const isValid = isTailscaleValid && isSshValid;
+    const isValid = isTailscaleValid && isSshValid && isAdguardValid;
     generateButton.disabled = !isValid;
     if (isValid) {
         copyButton.classList.add('visible');
@@ -118,6 +134,8 @@ function initPage() {
     document.getElementById('autoReboot').checked = true;
     document.getElementById('rebootTime').value = '02:00';
     document.getElementById('rebootWindow').value = 1;
+    document.getElementById('enableAdGuardDNS').checked = false;
+    document.getElementById('adguardDnsIp').value = '100.100.100.100';
 
     // Initialize visibility
     updateVisibility();
@@ -129,10 +147,15 @@ function initPage() {
         validateInputs();
     });
     document.getElementById('autoReboot').addEventListener('change', updateVisibility);
+    document.getElementById('enableAdGuardDNS').addEventListener('change', () => {
+        updateVisibility();
+        validateInputs();
+    });
 
     // Add event listeners for validation
     document.getElementById('tailscaleKey').addEventListener('input', validateInputs);
     document.getElementById('sshKey').addEventListener('input', validateInputs);
+    document.getElementById('adguardDnsIp').addEventListener('input', validateInputs);
 
     // Set initial button states
     validateInputs();
@@ -155,6 +178,12 @@ function updateVisibility() {
     document.getElementById('rebootOptions').classList.toggle(
         'hidden',
         !document.getElementById('autoReboot').checked
+    );
+    
+    // AdGuard DNS Options
+    document.getElementById('adguardDnsGroup').classList.toggle(
+        'hidden',
+        !document.getElementById('enableAdGuardDNS').checked
     );
 }
 
@@ -251,6 +280,46 @@ async function updatePreview() {
                 updateConf.contents.source = `data:;base64,${compressToGzipBase64('REBOOT_STRATEGY=off\n')}`;
             }
         }
+        
+        // Add AdGuard Home DNS configuration
+        const adguardEnabled = document.getElementById('enableAdGuardDNS').checked;
+        if (adguardEnabled) {
+            const dnsIp = document.getElementById('adguardDnsIp').value.trim();
+            
+            // Add resolv.conf file
+            if (!orderedConfig.storage.files.some(f => f.path === '/etc/resolv.conf')) {
+                orderedConfig.storage.files.push({
+                    path: '/etc/resolv.conf',
+                    overwrite: true,
+                    contents: {
+                        source: `data:,nameserver%20${dnsIp}%0A`
+                    },
+                    mode: 420
+                });
+            }
+            
+            // Add systemd-resolved.conf file
+            if (!orderedConfig.storage.files.some(f => f.path === '/etc/systemd/resolved.conf')) {
+                orderedConfig.storage.files.push({
+                    path: '/etc/systemd/resolved.conf',
+                    overwrite: true,
+                    contents: {
+                        source: `data:,%5BResolve%5D%0ADNS%3D${dnsIp}%0A`
+                    },
+                    mode: 420
+                });
+            }
+            
+            // Update Tailscale service to advertise DNS route
+            if (tailscaleService && tailscaleService.contents) {
+                if (!tailscaleService.contents.includes(`--advertise-routes=${dnsIp}/32`)) {
+                    tailscaleService.contents = tailscaleService.contents.replace(
+                        /-e TS_EXTRA_ARGS="--advertise-exit-node"/,
+                        `-e TS_EXTRA_ARGS="--advertise-exit-node --advertise-routes=${dnsIp}/32"`
+                    );
+                }
+            }
+        }
 
         document.getElementById('configPreview').textContent = JSON.stringify(orderedConfig, null, 2);
     } catch (error) {
@@ -277,6 +346,12 @@ async function generateConfig() {
                 id: 'timezone', 
                 check: () => document.getElementById('setTimezone').checked 
             },
+            {
+                id: 'adguardDnsIp',
+                check: () => document.getElementById('enableAdGuardDNS').checked,
+                message: 'Invalid AdGuard Home DNS IP address! Must be a Tailscale IP (100.x.y.z)',
+                validate: (value) => /^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value.trim())
+            }
         ];
 
         for (const field of requiredFields) {

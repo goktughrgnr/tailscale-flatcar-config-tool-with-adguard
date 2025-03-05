@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flatcar Config Generator</title>
+    <title>Flatcar Config Generator with AdGuard Home</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
@@ -13,11 +13,23 @@
 </head>
 <body>
     <div class="container">
-        <h1>Flatcar Tailscale Config Generator</h1>
+        <h1>Flatcar Tailscale Config Generator with AdGuard Home</h1>
         <div id="app">
             <div class="form-group">
                 <label for="tailscaleKey">Tailscale Auth Key *</label>
                 <input type="text" id="tailscaleKey" placeholder="tskey-auth-...">
+            </div>
+
+            <!-- AdGuard Home DNS Configuration -->
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="enableAdGuardDNS"> Enable AdGuard Home DNS
+                </label>
+                <div id="adguardDnsGroup" class="hidden">
+                    <label for="adguardDnsIp">AdGuard Home DNS IP Address</label>
+                    <input type="text" id="adguardDnsIp" placeholder="100.x.y.z" value="100.100.100.100">
+                    <p class="help-text">Enter the Tailscale IP address of your AdGuard Home server</p>
+                </div>
             </div>
 
             <div class="form-group">
